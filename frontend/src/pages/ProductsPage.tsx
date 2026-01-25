@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getProducts, createProduct } from "../api/productsApi";
 import { Product, Category, Unit, ProductCreate } from "../types";
 import { Plus, Search, Filter } from "lucide-react";
 
 export default function ProductsPage() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -17,6 +19,9 @@ export default function ProductsPage() {
     stock_qty: 0,
     price_per_sqft: 0,
     price_per_piece: 0,
+    thickness: "",
+    dimension: "",
+    gst_rate: 18,
   });
 
   const fetchProducts = async () => {
@@ -49,6 +54,9 @@ export default function ProductsPage() {
         stock_qty: 0,
         price_per_sqft: 0,
         price_per_piece: 0,
+        thickness: "",
+        dimension: "",
+        gst_rate: 18,
       });
     } catch (e) {
       alert("Error creating product");
@@ -123,6 +131,27 @@ export default function ProductsPage() {
 
             <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Thickness</label>
+                <input
+                  className="input-field"
+                  value={formData.thickness}
+                  onChange={(e) => setFormData({ ...formData, thickness: e.target.value })}
+                  placeholder="Ex. 12mm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Dimension</label>
+                <input
+                  className="input-field"
+                  value={formData.dimension}
+                  onChange={(e) => setFormData({ ...formData, dimension: e.target.value })}
+                  placeholder="Ex. 8x4"
+                />
+              </div>
+            </div>
+
+            <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Price / SqFt (₹)</label>
                 <input
                   type="number"
@@ -132,14 +161,24 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Price / Piece (₹)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">GST Rate (%)</label>
                 <input
                   type="number"
                   className="input-field"
-                  value={formData.price_per_piece}
-                  onChange={(e) => setFormData({ ...formData, price_per_piece: Number(e.target.value) })}
+                  value={formData.gst_rate}
+                  onChange={(e) => setFormData({ ...formData, gst_rate: Number(e.target.value) })}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Price / Piece (₹)</label>
+              <input
+                type="number"
+                className="input-field"
+                value={formData.price_per_piece}
+                onChange={(e) => setFormData({ ...formData, price_per_piece: Number(e.target.value) })}
+              />
             </div>
 
             <div className="md:col-span-3 flex justify-end">
@@ -168,6 +207,7 @@ export default function ProductsPage() {
               <thead>
                 <tr>
                   <th className="table-th text-left pl-6">Product Name</th>
+                  <th className="table-th text-left">Thickness/Dim</th>
                   <th className="table-th text-left">Category</th>
                   <th className="table-th text-right">Stock</th>
                   <th className="table-th text-left">Unit</th>
@@ -179,8 +219,15 @@ export default function ProductsPage() {
                   <tr><td colSpan={5} className="p-6 text-center text-slate-500">No products found. Add some!</td></tr>
                 )}
                 {products.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={p.id}
+                    onClick={() => navigate(`/products/${p.id}/edit`)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
                     <td className="table-td pl-6 font-medium text-slate-900">{p.name}</td>
+                    <td className="table-td text-slate-500 text-xs">
+                      {p.thickness || p.dimension ? `${p.thickness || ''} ${p.dimension || ''}` : '-'}
+                    </td>
                     <td className="table-td">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {p.category}
@@ -189,7 +236,7 @@ export default function ProductsPage() {
                     <td className="table-td text-right font-mono">{p.stock_qty}</td>
                     <td className="table-td text-slate-500 text-xs">{p.base_unit}</td>
                     <td className="table-td text-right pr-6 font-mono font-medium text-slate-700">
-                      {p.price_per_sqft ? `₹${p.price_per_sqft}/sqft` : `₹${p.price_per_piece}/pc`}
+                      ₹{p.price_per_piece}/pc
                     </td>
                   </tr>
                 ))}

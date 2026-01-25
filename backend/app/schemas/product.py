@@ -10,6 +10,8 @@ class ProductBase(BaseModel):
     price_per_sqft: float | None = None
     price_per_piece: float | None = None
     hsn_code: str | None = None
+    thickness: str | None = None
+    dimension: str | None = None
     gst_rate: float = 0.0
     stock_qty: float = 0.0
 
@@ -20,4 +22,4 @@ class ProductOut(ProductBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True

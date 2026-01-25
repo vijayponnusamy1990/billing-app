@@ -27,7 +27,9 @@ def test_login_and_create_product():
         "base_unit": "PIECE",
         "stock_qty": 100,
         "price_per_sqft": 50.0,
-        "price_per_piece": 2000.0
+        "price_per_piece": 2000.0,
+        "thickness": "12mm",
+        "dimension": "8x4"
     }
     response = client.post("/api/products/", json=product_data, headers=headers)
     assert response.status_code == 200

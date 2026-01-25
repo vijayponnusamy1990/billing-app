@@ -7,6 +7,8 @@ from app.schemas.customer import CustomerOut
 class InvoiceItemCreate(BaseModel):
     product_id: int
     description: str | None = None
+    thickness: str | None = None
+    dimension: str | None = None
     quantity: float
     unit: Unit
     length_ft: float | None = None
@@ -29,6 +31,8 @@ class InvoiceItemOut(BaseModel):
     id: int
     product_id: int
     description: str | None
+    thickness: str | None = None
+    dimension: str | None = None
     quantity: float
     unit: Unit
     area_sqft: float | None
@@ -42,7 +46,7 @@ class InvoiceItemOut(BaseModel):
     igst_amount: float
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class InvoiceOut(BaseModel):
     id: int
@@ -58,4 +62,4 @@ class InvoiceOut(BaseModel):
     items: List[InvoiceItemOut]
 
     class Config:
-        orm_mode = True
+        from_attributes = True

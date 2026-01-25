@@ -87,7 +87,9 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
 
         inv_item = InvoiceItem(
             product_id=product.id,
-            description=item_in.description,
+            description=item_in.description or product.name,
+            thickness=item_in.thickness or product.thickness,
+            dimension=item_in.dimension or product.dimension,
             quantity=item_in.quantity,
             unit=item_in.unit,
             length_ft=item_in.length_ft,

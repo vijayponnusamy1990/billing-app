@@ -28,8 +28,11 @@ class InvoiceItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
     product_id = Column(Integer, ForeignKey("products.id"))
+    product_batch_id = Column(Integer, ForeignKey("product_batches.id"), nullable=True)
 
     description = Column(String, nullable=True)
+    thickness = Column(String, nullable=True)
+    dimension = Column(String, nullable=True)
     quantity = Column(Float, nullable=False)
     unit = Column(Enum(Unit), nullable=False)
     length_ft = Column(Float, nullable=True)
@@ -46,3 +49,4 @@ class InvoiceItem(Base):
 
     invoice = relationship("Invoice", back_populates="items")
     product = relationship("Product")
+    batch = relationship("app.models.product.ProductBatch")

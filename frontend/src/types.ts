@@ -20,6 +20,8 @@ export interface Product {
     price_per_piece?: number;
     stock_qty: number;
     hsn_code?: string;
+    thickness?: string;
+    dimension?: string;
     gst_rate?: number;
 }
 
@@ -32,7 +34,10 @@ export interface ProductCreate {
     price_per_sqft?: number;
     price_per_piece?: number;
     stock_qty: number;
+    thickness?: string;
+    dimension?: string;
     gst_rate?: number;
+    hsn_code?: string;
 }
 
 export interface InvoiceItemCreate {
@@ -43,6 +48,8 @@ export interface InvoiceItemCreate {
     length_ft?: number;
     width_ft?: number;
     area_sqft?: number;
+    thickness?: string;
+    dimension?: string;
 }
 
 export interface Customer {
@@ -76,6 +83,8 @@ export interface InvoiceItem {
     length_ft?: number;
     width_ft?: number;
     area_sqft?: number;
+    thickness?: string;
+    dimension?: string;
     cgst_amount: number;
     sgst_amount: number;
     igst_amount: number;

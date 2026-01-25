@@ -17,23 +17,28 @@ A full-stack Point of Sale (POS) and Inventory Management system built with Pyth
 The easiest way to run the entire stack (Backend + Frontend + Database) is using Docker Compose.
 
 ### Prerequisites
+
 - Docker and Docker Compose installed.
 
 ### Steps
+
 1. **Clone the repository** (if you haven't already):
+
    ```bash
    git clone <repository-url>
    cd billing-app
    ```
 
 2. **Build and Run**:
+
    ```bash
    docker-compose up --build
    ```
+
    *This command builds the images and starts the containers in the foreground.*
 
 3. **Access the Application**:
-   - **Frontend**: [http://localhost:3000](http://localhost:3000)
+   - **Frontend**: [http://localhost](http://localhost)
    - **Backend API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
    - **Database**: PostgreSQL running on port `5432`.
 
@@ -50,50 +55,58 @@ If you prefer to run the services separately without Docker.
 ### 1. Backend Setup
 
 1. **Navigate to the backend directory**:
+
    ```bash
    cd backend
    ```
 
 2. **Run the setup script**:
    *This script creates a virtual environment, installs dependencies, and seeds the database.*
+
    ```bash
    ./setup.sh
    # Note the credentials printed at the end.
    ```
 
 3. **Start the Development Server**:
+
    ```bash
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    uvicorn app.main:app --reload
    ```
+
    *The backend will run at [http://localhost:8000](http://localhost:8000).*
 
 ### 2. Frontend Setup
 
 1. **Navigate to the frontend directory**:
+
    ```bash
    cd frontend
    ```
 
 2. **Install Dependencies**:
+
    ```bash
    npm install
    ```
 
 3. **Start the Development Server**:
+
    ```bash
    ./run_dev.sh
    # OR
    npm run dev
    ```
-   *The frontend will run at [http://localhost:3000](http://localhost:3000).*
+
+   *The frontend will run at [http://localhost](http://localhost).*
 
 ---
 
 ## 📚 Key Features
 
 - **Authentication**: Secure JWT-based login with role management (Admin, Manager, Sales).
-- **Inventory**: 
+- **Inventory**:
   - Track stock by **Unit** (Piece vs Sq. Ft).
   - Dual pricing support (Price per Piece / Price per Sq. Ft).
 - **Billing**:

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { getInvoice } from "../api/invoicesApi";
 import { Invoice } from "../types";
 import { Printer, ArrowLeft, Hexagon } from "lucide-react";
 
 export default function InvoiceDetailsPage() {
     const { id } = useParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [invoice, setInvoice] = useState<Invoice | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -17,6 +18,20 @@ export default function InvoiceDetailsPage() {
                 .finally(() => setLoading(false));
         }
     }, [id]);
+
+    useEffect(() => {
+        if (!loading && invoice && searchParams.get('print') === 'true') {
+            // Short delay to ensure rendering is complete before print dialog
+            const timer = setTimeout(() => {
+                window.print();
+                // Clean up the URL
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.delete('print');
+                setSearchParams(nextParams, { replace: true });
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [loading, invoice, searchParams, setSearchParams]);
 
     const handlePrint = () => {
         window.print();
@@ -73,7 +88,7 @@ export default function InvoiceDetailsPage() {
                     <thead>
                         <tr className="border-b-2 border-slate-100">
                             <th className="text-left py-3 text-sm font-bold text-slate-600">Item</th>
-                            <th className="text-center py-3 text-sm font-bold text-slate-600">Qty</th>
+                            <th className="text-center py-3 text-sm font-bold text-slate-600">Quantity</th>
                             <th className="text-right py-3 text-sm font-bold text-slate-600">Rate</th>
                             <th className="text-right py-3 text-sm font-bold text-slate-600">Amount</th>
                         </tr>
@@ -83,12 +98,13 @@ export default function InvoiceDetailsPage() {
                             <tr key={idx}>
                                 <td className="py-3">
                                     <p className="font-medium text-slate-800">{item.description}</p>
-                                    <p className="text-xs text-slate-400">
-                                        {item.unit === 'SQFT' ? `${item.length_ft}' x ${item.width_ft}'` : ''}
+                                    <p className="text-[10px] text-slate-400">
+                                        {[item.thickness, item.dimension].filter(Boolean).join(' | ')}
                                     </p>
                                 </td>
-                                <td className="text-center py-3 text-slate-600">
-                                    {item.quantity} {item.unit === 'SQFT' ? 'pcs' : ''}
+                                <td className="text-center py-3">
+                                    <div className="text-slate-900 font-medium">{item.quantity}</div>
+                                    <div className="text-[9px] text-slate-400 uppercase tracking-tighter">Pieces</div>
                                 </td>
                                 <td className="text-right py-3 font-mono text-slate-600">₹{item.rate}</td>
                                 <td className="text-right py-3 font-mono font-medium text-slate-800">₹{item.taxable_amount.toFixed(2)}</td>
