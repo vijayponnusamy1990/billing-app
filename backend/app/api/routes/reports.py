@@ -11,16 +11,20 @@ from app.models.product import Product
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/daily-sales", dependencies=[Depends(role_required([UserRole.ADMIN, UserRole.MANAGER]))])
-def get_daily_sales(db: Session = Depends(get_db)):
-    # SQLite-specific date truncation might be needed, but for now we'll rely on python-side grouping 
-    # OR better use func.date() which works in SQLite.
-    
+def get_daily_sales(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     # Query: Date, Total Sales, Count of Invoices
-    results = db.query(
+    query = db.query(
         func.date(Invoice.date).label("date"),
         func.count(Invoice.id).label("invoice_count"),
         func.sum(Invoice.grand_total).label("total_sales")
-    ).group_by(func.date(Invoice.date)).order_by(func.date(Invoice.date).desc()).all()
+    )
+    
+    if start_date:
+        query = query.filter(func.date(Invoice.date) >= start_date)
+    if end_date:
+        query = query.filter(func.date(Invoice.date) <= end_date)
+        
+    results = query.group_by(func.date(Invoice.date)).order_by(func.date(Invoice.date).desc()).all()
     
     return [
         {"date": r.date, "invoice_count": r.invoice_count, "total_sales": r.total_sales}
@@ -28,15 +32,22 @@ def get_daily_sales(db: Session = Depends(get_db)):
     ]
 
 @router.get("/product-sales", dependencies=[Depends(role_required([UserRole.ADMIN, UserRole.MANAGER]))])
-def get_product_sales(db: Session = Depends(get_db)):
+def get_product_sales(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     # Query: Product Name, Category, Total Qty Sold, Total Amount
-    results = db.query(
+    query = db.query(
         Product.name,
         Product.category,
         func.sum(InvoiceItem.quantity).label("total_qty"),
         func.sum(InvoiceItem.taxable_amount).label("total_amount")
     ).join(Product, InvoiceItem.product_id == Product.id)\
-     .group_by(Product.id)\
+     .join(Invoice, InvoiceItem.invoice_id == Invoice.id)
+    
+    if start_date:
+        query = query.filter(func.date(Invoice.date) >= start_date)
+    if end_date:
+        query = query.filter(func.date(Invoice.date) <= end_date)
+        
+    results = query.group_by(Product.id)\
      .order_by(func.sum(InvoiceItem.taxable_amount).desc()).all()
 
     return [

@@ -13,12 +13,16 @@ export interface ProductSales {
     total_amount: number;
 }
 
-export async function getDailySales() {
-    const res = await axiosClient.get<DailySales[]>("/reports/daily-sales");
+export async function getDailySales(startDate?: string, endDate?: string) {
+    const res = await axiosClient.get<DailySales[]>("/reports/daily-sales", {
+        params: { start_date: startDate, end_date: endDate }
+    });
     return res.data;
 }
 
-export async function getProductSales() {
-    const res = await axiosClient.get<ProductSales[]>("/reports/product-sales");
+export async function getProductSales(startDate?: string, endDate?: string) {
+    const res = await axiosClient.get<ProductSales[]>("/reports/product-sales", {
+        params: { start_date: startDate, end_date: endDate }
+    });
     return res.data;
 }
