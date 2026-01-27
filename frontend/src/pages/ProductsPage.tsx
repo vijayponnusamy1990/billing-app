@@ -4,8 +4,11 @@ import { getProducts, createProduct } from "../api/productsApi";
 import { Product, Category, Unit, ProductCreate } from "../types";
 import { Plus, Search, Filter } from "lucide-react";
 
+import { useToast } from "../components/Toaster";
+
 export default function ProductsPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -22,6 +25,7 @@ export default function ProductsPage() {
     thickness: "",
     dimension: "",
     gst_rate: 18,
+    low_stock_limit: 5,
   });
 
   const fetchProducts = async () => {
@@ -31,6 +35,7 @@ export default function ProductsPage() {
       setProducts(data);
     } catch (e) {
       console.error(e);
+      toast.error("Failed to load products");
     } finally {
       setLoading(false);
     }
@@ -46,6 +51,7 @@ export default function ProductsPage() {
       await createProduct(formData);
       setIsCreating(false);
       fetchProducts();
+      toast.success("Product created successfully!");
       // Reset
       setFormData({
         name: "",
@@ -57,9 +63,10 @@ export default function ProductsPage() {
         thickness: "",
         dimension: "",
         gst_rate: 18,
+        low_stock_limit: 5,
       });
     } catch (e) {
-      alert("Error creating product");
+      toast.error("Error creating product");
     }
   };
 

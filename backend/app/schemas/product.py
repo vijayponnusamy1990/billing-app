@@ -14,6 +14,7 @@ class ProductBase(BaseModel):
     dimension: str | None = None
     gst_rate: float = 0.0
     stock_qty: float = 0.0
+    low_stock_limit: float = 0.0
 
 class ProductCreate(ProductBase):
     pass

@@ -14,6 +14,7 @@ class InvoiceItemCreate(BaseModel):
     length_ft: float | None = None
     width_ft: float | None = None
     area_sqft: float | None = None
+    manual_rate: float | None = None  # Optional override for unit rate
 
 class InvoiceCreate(BaseModel):
     invoice_no: str
@@ -22,6 +23,8 @@ class InvoiceCreate(BaseModel):
     customer_name: str | None = None
     customer_phone: str | None = None
     customer_address: str | None = None
+    customer_billing_address: str | None = None
+    customer_shipping_address: str | None = None
     customer_gstin: str | None = None
     date: datetime | None = None  # Optional override
     notes: str | None = None
@@ -30,6 +33,7 @@ class InvoiceCreate(BaseModel):
 class InvoiceItemOut(BaseModel):
     id: int
     product_id: int
+    hsn_code: str | None = None
     description: str | None
     thickness: str | None = None
     dimension: str | None = None
@@ -63,3 +67,8 @@ class InvoiceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class InvoiceList(BaseModel):
+    items: List[InvoiceOut]
+    total: int
+

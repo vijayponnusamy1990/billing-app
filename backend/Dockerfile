@@ -7,9 +7,9 @@ RUN apt-get update && apt-get install -y gcc
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# Ensure postgres driver is available for docker environment
-RUN pip install psycopg2-binary
+# Ensure sqlite is sufficient
 
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+RUN chmod +x entrypoint.sh
+CMD ["./entrypoint.sh"]

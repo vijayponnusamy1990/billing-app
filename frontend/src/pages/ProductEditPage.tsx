@@ -4,9 +4,12 @@ import { getProducts, updateProduct } from "../api/productsApi";
 import { Product, Category, Unit } from "../types";
 import { ArrowLeft, Save } from "lucide-react";
 
+import { useToast } from "../components/Toaster";
+
 export default function ProductEditPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [product, setProduct] = useState<Product | null>(null);
@@ -19,12 +22,12 @@ export default function ProductEditPage() {
                 if (found) {
                     setProduct(found);
                 } else {
-                    alert("Product not found");
+                    toast.error("Product not found");
                     navigate("/products");
                 }
             } catch (e) {
                 console.error(e);
-                alert("Error loading product");
+                toast.error("Error loading product");
             } finally {
                 setLoading(false);
             }
@@ -33,7 +36,7 @@ export default function ProductEditPage() {
         if (id) {
             fetchProduct();
         }
-    }, [id, navigate]);
+    }, [id, navigate, toast]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -51,12 +54,13 @@ export default function ProductEditPage() {
                 dimension: product.dimension,
                 gst_rate: product.gst_rate,
                 hsn_code: product.hsn_code,
+                low_stock_limit: product.low_stock_limit,
             });
-            alert("Product updated successfully!");
+            toast.success("Product updated successfully!");
             navigate("/products");
         } catch (e) {
             console.error(e);
-            alert("Error updating product");
+            toast.error("Error updating product");
         } finally {
             setSaving(false);
         }
@@ -161,6 +165,16 @@ export default function ProductEditPage() {
                         </div>
 
                         <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Low Stock Alert Limit</label>
+                            <input
+                                type="number"
+                                className="input-field"
+                                value={product.low_stock_limit ?? 0}
+                                onChange={(e) => setProduct({ ...product, low_stock_limit: Number(e.target.value) })}
+                            />
+                        </div>
+
+                        <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">HSN Code</label>
                             <input
                                 className="input-field"
@@ -184,7 +198,7 @@ export default function ProductEditPage() {
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

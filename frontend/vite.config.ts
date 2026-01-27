@@ -6,6 +6,10 @@ export default defineConfig({
   server: {
     port: 80,
     host: true, // Listen on all addresses, including LAN and public addresses
+    allowedHosts: [
+      "dev.aaravicouture.in",
+      "aaravicouture.in"
+    ],
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8000",

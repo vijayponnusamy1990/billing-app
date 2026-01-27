@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import engine
 from app.db.base import Base
-from app.api.routes import auth, products, invoices, reports
+from app.api.routes import auth, products, invoices, reports, dashboard, users, customers
 
 Base.metadata.create_all(bind=engine)
 
@@ -17,7 +17,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix=settings.API_V1_STR)
-app.include_router(products.router, prefix=settings.API_V1_STR)
-app.include_router(invoices.router, prefix=settings.API_V1_STR)
-app.include_router(reports.router, prefix=settings.API_V1_STR)
+app.include_router(auth.router, prefix="/api")
+app.include_router(products.router, prefix="/api")
+app.include_router(invoices.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+app.include_router(customers.router, prefix="/api")

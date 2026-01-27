@@ -2,77 +2,100 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getProducts } from "../api/productsApi";
 import { createInvoice } from "../api/invoicesApi";
-import { Product, Unit, InvoiceItemCreate } from "../types";
-import { Plus, Trash2, Save, ShoppingCart, Calculator, User, Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { searchCustomers } from "../api/customersApi";
+import { Product, Unit, InvoiceItemCreate, Customer } from "../types";
+import { Plus, Trash2, Save, ShoppingCart, Calculator, User, Calendar, ChevronDown, ChevronUp, Printer, Package, AlertTriangle } from "lucide-react";
 import Autocomplete from "../components/Autocomplete";
+import { useToast } from "../components/Toaster";
 
 export default function NewInvoicePage() {
   const navigate = useNavigate();
+  const toast = useToast();
+  const [role] = useState(localStorage.getItem("role") || "SALES");
   const [products, setProducts] = useState<Product[]>([]);
-  const [items, setItems] = useState<InvoiceItemCreate[]>([]);
+  const [items, setItems] = useState<(InvoiceItemCreate & { id_key: string })[]>([]);
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerGstin, setCustomerGstin] = useState("");
-  // Address fields
-  const [addrLine1, setAddrLine1] = useState("");
-  const [addrLine2, setAddrLine2] = useState("");
-  const [city, setCity] = useState("");
+  const [billingAddress, setBillingAddress] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
+  const [isShippingSame, setIsShippingSame] = useState(true);
+
+  // Active Entry Row State
+  const [activeEntry, setActiveEntry] = useState<{
+    productId: string;
+    qty: number;
+    manualRate: number | null;
+  }>({ productId: "", qty: 1, manualRate: null });
+
+  useEffect(() => {
+    if (isShippingSame) {
+      setShippingAddress(billingAddress);
+    }
+  }, [isShippingSame, billingAddress]);
 
   const [showTaxes, setShowTaxes] = useState(false);
-
-  // Current Item State - Simplified to pieces only
-  const [selectedProductId, setSelectedProductId] = useState<string>("");
-  const [qty, setQty] = useState<number>(1);
 
   useEffect(() => {
     getProducts().then(setProducts);
   }, []);
 
-  const selectedProduct = products.find(p => p.id === Number(selectedProductId));
+  const selectedProduct = products.find(p => p.id === Number(activeEntry.productId));
 
-  const calculateItemTotal = (item: InvoiceItemCreate, product: Product) => {
-    const taxable = calculateItemTaxable(item, product);
-    const gstRate = product.gst_rate || 0;
+  const calculateItemTaxable = (item: { quantity: number; manual_rate?: number; product_id: number }) => {
+    const p = products.find(prod => prod.id === item.product_id);
+    if (!p) return 0;
+    const rate = item.manual_rate !== undefined ? item.manual_rate : (p.price_per_piece || 0);
+    return item.quantity * rate;
+  };
+
+  const calculateItemTotal = (item: { quantity: number; manual_rate?: number; product_id: number }) => {
+    const p = products.find(prod => prod.id === item.product_id);
+    if (!p) return 0;
+    const taxable = calculateItemTaxable(item);
+    const gstRate = p.gst_rate || 0;
     return taxable * (1 + gstRate / 100);
   };
 
-  const calculateItemTaxable = (item: InvoiceItemCreate, product: Product) => {
-    return item.quantity * (product.price_per_piece || 0);
-  };
-
   const addItem = () => {
-    if (!selectedProduct || qty <= 0) return;
+    if (!selectedProduct || activeEntry.qty <= 0) {
+      toast.error("Please select a product and quantity");
+      return;
+    }
 
-    const newItem: InvoiceItemCreate = {
+    if (activeEntry.qty > selectedProduct.stock_qty) {
+      toast.error(`Insufficient stock! Available: ${selectedProduct.stock_qty}`);
+      return;
+    }
+
+    const newItem = {
+      id_key: Date.now().toString(),
       product_id: selectedProduct.id,
-      quantity: qty,
-      unit: Unit.PIECE, // Always piece
-      length_ft: undefined,
-      width_ft: undefined,
-      area_sqft: undefined,
+      quantity: activeEntry.qty,
+      unit: selectedProduct.base_unit,
+      description: selectedProduct.name,
       thickness: selectedProduct.thickness,
       dimension: selectedProduct.dimension,
-      description: selectedProduct.name
+      manual_rate: activeEntry.manualRate !== null ? activeEntry.manualRate : undefined
     };
 
     setItems([...items, newItem]);
-
-    // Reset all fields and close the product panel
-    setSelectedProductId("");
-    setQty(1);
+    setActiveEntry({ productId: "", qty: 1, manualRate: null });
   };
 
-  const removeItem = (idx: number) => {
-    const newItems = [...items];
-    newItems.splice(idx, 1);
-    setItems(newItems);
+  const removeItem = (idKey: string) => {
+    setItems(items.filter(it => it.id_key !== idKey));
+  };
+
+  const updateItemQty = (idKey: string, newQty: number) => {
+    setItems(items.map(it => it.id_key === idKey ? { ...it, quantity: newQty } : it));
   };
 
   const totals = items.reduce((acc, item) => {
     const p = products.find(prod => prod.id === item.product_id);
     if (!p) return acc;
-    const taxable = calculateItemTaxable(item, p);
+    const taxable = calculateItemTaxable(item);
     const gstRate = p.gst_rate || 0;
     const cgst = (taxable * (gstRate / 2)) / 100;
     const sgst = (taxable * (gstRate / 2)) / 100;
@@ -87,309 +110,359 @@ export default function NewInvoicePage() {
   const grandTotal = Math.round(totals.total);
   const roundOff = grandTotal - totals.total;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (shouldPrint: boolean) => {
     if (items.length === 0) {
-      alert("Please add at least one item to the invoice");
+      toast.error("Please add at least one item to the invoice");
       return;
     }
 
     if (!customerName || customerName.trim() === "") {
-      alert("Customer name is required");
+      toast.error("Customer name is required");
       return;
     }
 
     try {
-      const fullAddress = [addrLine1, addrLine2, city].filter(Boolean).join(", ");
+      const finalShippingAddress = isShippingSame ? billingAddress : shippingAddress;
+
       const createdInvoice = await createInvoice({
         invoice_no: `INV-${Date.now()}`,
-        items: items,
-        customer_id: undefined, // Let backend create new customer
+        items: items.map(({ id_key, ...rest }) => rest),
+        customer_id: undefined,
         customer_name: customerName,
         customer_phone: customerPhone,
-        customer_address: fullAddress,
+        customer_address: billingAddress,
+        customer_billing_address: billingAddress,
+        customer_shipping_address: finalShippingAddress,
         customer_gstin: customerGstin,
-        // date: removed, allow backend to set it
       });
-      alert("Invoice Created Successfully!");
-      navigate(`/invoices/${createdInvoice.id}?print=true`);
+      toast.success("Invoice Created Successfully!");
+      if (shouldPrint) {
+        navigate(`/invoices/${createdInvoice.id}?print=true`);
+      } else {
+        navigate(`/invoices/${createdInvoice.id}`);
+      }
     } catch (e) {
       console.error(e);
-      alert("Error creating invoice");
+      toast.error("Error creating invoice");
     }
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Top Section: Customer Details */}
-      <div className="card">
-        <div className="mb-4 border-b border-slate-100 pb-2">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <User size={18} className="text-blue-600" /> Customer Details
+    <div className="flex flex-col gap-6 max-w-[1600px] mx-auto pb-20">
+      {/* Header & Customer Section (Full Width, Compact) */}
+      <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-xl shadow-slate-200/50">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+            <User size={24} className="text-blue-600" />
+            <span>Customer Details</span>
           </h2>
+          <div className="flex items-center gap-4">
+            <div className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-blue-100">
+              Draft
+            </div>
+            <div className="text-sm font-bold text-slate-400">
+              # INV-{Date.now().toString().slice(-6)}
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Customer Name <span className="text-red-500">*</span></label>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+          <div className="md:col-span-1">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone / Search</label>
+            <Autocomplete
+              options={[]}
+              placeholder="99999..."
+              asyncSearch={async (query) => {
+                const results = await searchCustomers(query);
+                return results.map(c => ({
+                  id: c.id,
+                  label: c.phone || c.name,
+                  subLabel: c.name,
+                  detail: c.gstin,
+                  original: c
+                }));
+              }}
+              onSelect={(opt) => {
+                const c = opt.original as Customer;
+                setCustomerName(c.name);
+                setCustomerPhone(c.phone || "");
+                const addr = c.billing_address || c.address || "";
+                setBillingAddress(addr);
+                if (c.shipping_address) {
+                  setShippingAddress(c.shipping_address);
+                  setIsShippingSame(false);
+                } else {
+                  setShippingAddress(addr);
+                  setIsShippingSame(true);
+                }
+                setCustomerGstin(c.gstin || "");
+                toast.info("Customer loaded");
+              }}
+              value={customerPhone}
+              onChange={(val) => setCustomerPhone(val)}
+            />
+          </div>
+          <div className="md:col-span-1">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Customer Name</label>
             <input
-              type="text" placeholder="Walk-in Customer" className="input-field"
+              type="text" placeholder="Full Name" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3 text-slate-900 font-bold focus:bg-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-300"
               value={customerName} onChange={e => setCustomerName(e.target.value)}
-              required
             />
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Phone</label>
+          <div className="md:col-span-2">
+            <div className="flex justify-between items-center mb-2 ml-1">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Billing Address</label>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input type="checkbox" checked={isShippingSame} onChange={e => setIsShippingSame(e.target.checked)} className="rounded-md text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300 transition-all" />
+                <span className="text-[10px] font-black text-slate-400 group-hover:text-blue-500 transition-colors uppercase tracking-tight">Shipping Same</span>
+              </label>
+            </div>
             <input
-              type="text" placeholder="98765..." className="input-field"
-              value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Address Line 1</label>
-            <input
-              type="text" placeholder="Shop/Flat No, Street" className="input-field"
-              value={addrLine1} onChange={e => setAddrLine1(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Address Line 2</label>
-            <input
-              type="text" placeholder="Area/Locality" className="input-field"
-              value={addrLine2} onChange={e => setAddrLine2(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">City</label>
-            <input
-              type="text" placeholder="City" className="input-field"
-              value={city} onChange={e => setCity(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Customer GSTIN</label>
-            <input
-              type="text" placeholder="29XXXXX..." className="input-field"
-              value={customerGstin} onChange={e => setCustomerGstin(e.target.value)}
+              type="text" placeholder="Complete address..." className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3 text-slate-900 font-bold focus:bg-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-300"
+              value={billingAddress} onChange={e => setBillingAddress(e.target.value)}
             />
           </div>
         </div>
       </div>
 
-      {/* Merged Items Widget */}
-      <div className="card p-0 overflow-hidden">
-        <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                <Calculator size={24} className="text-blue-600" /> Invoice Items
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">{items.length} item{items.length !== 1 ? 's' : ''} added</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Search & Entry Section */}
-        <div className="p-6 border-b border-slate-50">
-          <div className="mb-4">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Search Product to Add</label>
-            <Autocomplete
-              options={products.map(p => {
-                const label = [p.name, p.thickness, p.dimension].filter(Boolean).join(" ");
-                const priceText = `₹${p.price_per_piece}/pc`;
-
-                return {
-                  id: p.id,
-                  label: label,
-                  subLabel: `${p.category} • ${priceText}`,
-                  detail: `Stock: ${p.stock_qty}`,
-                  original: p
-                };
-              })}
-              onSelect={(opt) => setSelectedProductId(opt.id.toString())}
-              placeholder="Type product name, thickness, or category..."
-            />
-          </div>
-
-          {/* Selected Product Details Panel */}
-          {selectedProduct && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${selectedProduct.category === 'PLYWOOD' ? 'bg-amber-200 text-amber-800' :
-                      selectedProduct.category === 'GLASS' ? 'bg-blue-200 text-blue-800' :
-                        'bg-slate-200 text-slate-800'
-                      }`}>
-                      {selectedProduct.category}
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-1">
-                    {[selectedProduct.name, selectedProduct.thickness, selectedProduct.dimension].filter(Boolean).join(" ")}
-                  </h3>
-                  <p className="text-sm text-slate-600">Stock Available: {selectedProduct.stock_qty} Pieces</p>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Price</div>
-                  <div className="text-3xl font-bold text-blue-700">
-                    ₹{selectedProduct.price_per_piece}
-                  </div>
-                  <div className="text-xs text-slate-600 mt-1">per Piece</div>
-                </div>
-              </div>
-
-              {/* Quantity Input */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Quantity (Pieces)</label>
-                <input
-                  type="number"
-                  className="input-field text-2xl font-bold text-center"
-                  placeholder="0"
-                  min="1"
-                  value={qty || ''}
-                  onChange={e => setQty(Number(e.target.value))}
-                />
-              </div>
-
-              {/* Item Total */}
-              <div className="bg-white rounded-lg p-4 mb-4 border-2 border-blue-300">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-slate-600">Item Total (incl. GST):</span>
-                  <span className="text-3xl font-bold text-green-600">
-                    ₹{calculateItemTotal({
-                      product_id: selectedProduct.id,
-                      quantity: qty,
-                      unit: Unit.PIECE,
-                    } as InvoiceItemCreate, selectedProduct).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Add Button */}
-              <button
-                onClick={addItem}
-                disabled={!selectedProduct || qty <= 0}
-                className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl shadow-lg shadow-green-600/30 hover:shadow-green-600/50 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none font-bold text-lg flex justify-center items-center gap-3 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
-              >
-                <Plus size={24} strokeWidth={3} />
-                Add to Invoice
-              </button>
-            </div>
-          )}
+      {/* Unified Table-Entry System */}
+      <div className="bg-white border border-slate-200 rounded-[2rem] shadow-2xl shadow-slate-200/40">
+        <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+            <Calculator size={24} className="text-blue-600" />
+            <span>Invoice Components</span>
+          </h2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="table-th pl-6 text-left">Item</th>
-                <th className="table-th text-center w-32">Quantity</th>
-                <th className="table-th text-right w-32">Total</th>
-                <th className="table-th w-16"></th>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left w-12">#</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Product / Description</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-28">HSN</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-32">Qty</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-40">Rate (₹)</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-24">GST</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-44">Row Total</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-20"></th>
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-12 text-center text-slate-400">
-                    <Calculator size={48} className="mx-auto mb-3 opacity-20" />
-                    <p>No items added yet</p>
-                  </td>
-                </tr>
-              ) : (
-                items.map((item, idx) => {
-                  const p = products.find(prod => prod.id === item.product_id);
-                  if (!p) return null;
-                  const total = calculateItemTotal(item, p);
-                  const fullName = [p.name, p.thickness, p.dimension].filter(Boolean).join(" ");
+              {items.map((item, idx) => {
+                const p = products.find(prod => prod.id === item.product_id);
+                if (!p) return null;
+                const total = calculateItemTotal(item);
+                const taxable = calculateItemTaxable(item);
+                const fullName = [p.name, p.thickness, p.dimension].filter(Boolean).join(" ");
 
-                  return (
-                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                      <td className="table-td pl-6">
-                        <div className="font-semibold text-slate-800">{fullName}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${p.category === 'PLYWOOD' ? 'bg-amber-100 text-amber-700' :
-                            p.category === 'GLASS' ? 'bg-blue-100 text-blue-700' :
-                              'bg-slate-100 text-slate-700'
-                            }`}>
-                            {p.category}
+                return (
+                  <tr key={item.id_key} className="border-b border-slate-50 group hover:bg-blue-50/30 transition-colors">
+                    <td className="px-6 py-6 text-sm font-black text-slate-300">{idx + 1}</td>
+                    <td className="px-6 py-6">
+                      <div className="font-bold text-slate-900 text-lg tracking-tight">{fullName}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${p.category === 'PLYWOOD' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {p.category}
+                        </span>
+                        {item.manual_rate !== undefined && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter bg-purple-100 text-purple-600 border border-purple-200">
+                            Overridden Rate
                           </span>
-                        </div>
-                      </td>
-                      <td className="table-td text-center">
-                        <div className="text-lg font-bold text-slate-800">{item.quantity}</div>
-                        <div className="text-[9px] text-slate-400 uppercase tracking-wider">Pieces</div>
-                      </td>
-                      <td className="table-td text-right">
-                        <div className="text-lg font-bold text-green-600">₹{total.toFixed(2)}</div>
-                      </td>
-                      <td className="table-td pr-6 text-right">
-                        <button
-                          onClick={() => removeItem(idx)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-6 text-center text-sm font-bold text-slate-400">{p.hsn_code || '---'}</td>
+                    <td className="px-6 py-6 text-center">
+                      <input
+                        type="number"
+                        className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center font-black text-slate-900 focus:border-blue-500 outline-none"
+                        value={item.quantity}
+                        min="1"
+                        onChange={(e) => updateItemQty(item.id_key, Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-6 py-6 text-right">
+                      <div className="text-lg font-black text-slate-900">₹{(item.manual_rate || p.price_per_piece || 0).toLocaleString()}</div>
+                      <div className="text-[10px] font-bold text-slate-400 tracking-tighter italic">Base: ₹{p.price_per_piece}</div>
+                    </td>
+                    <td className="px-6 py-6 text-center">
+                      <div className="text-xs font-black text-slate-900">{p.gst_rate}%</div>
+                      <div className="text-[9px] font-bold text-slate-400 tracking-tighter">₹{(total - taxable).toFixed(2)}</div>
+                    </td>
+                    <td className="px-6 py-6 text-right">
+                      <div className="text-xl font-black text-slate-900 tracking-tighter">₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    </td>
+                    <td className="px-6 py-6 text-center">
+                      <button
+                        onClick={() => removeItem(item.id_key)}
+                        className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+                        title="Remove Item"
+                      >
+                        <Trash2 size={20} className="hidden group-hover:block" />
+                        <span className="text-2xl font-black group-hover:hidden">-</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* Inline Entry Row */}
+              <tr className="bg-slate-50/50">
+                <td className="px-6 py-10">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl font-black shadow-lg shadow-blue-500/30">
+                    <Plus size={20} strokeWidth={4} />
+                  </div>
+                </td>
+                <td className="px-6 py-10">
+                  <Autocomplete
+                    options={products.map(p => ({
+                      id: p.id,
+                      label: [p.name, p.thickness, p.dimension].filter(Boolean).join(" "),
+                      subLabel: `${p.category} • ₹${p.price_per_piece}/pc`,
+                      detail: `Stock: ${p.stock_qty}`,
+                      original: p
+                    }))}
+                    onSelect={(opt) => setActiveEntry({ ...activeEntry, productId: opt.id.toString(), manualRate: null })}
+                    placeholder="Search product to add..."
+                    value={activeEntry.productId ? [products.find(p => p.id === Number(activeEntry.productId))?.name, products.find(p => p.id === Number(activeEntry.productId))?.thickness, products.find(p => p.id === Number(activeEntry.productId))?.dimension].filter(Boolean).join(" ") : ""}
+                    onChange={() => { }} // Controlled via onSelect
+                    dropdownPosition="top"
+                  />
+                  {selectedProduct && (
+                    <div className="mt-2 flex items-center gap-4 animate-in fade-in slide-in-from-left-2 transition-all">
+                      <div className="flex items-center gap-1 text-[10px] font-black text-slate-400">
+                        <Package size={12} className="text-blue-500" />
+                        <span>STOCK: <span className={selectedProduct.stock_qty < 10 ? 'text-red-500' : 'text-slate-900'}>{selectedProduct.stock_qty} PCS</span></span>
+                      </div>
+                    </div>
+                  )}
+                </td>
+                <td className="px-6 py-10 text-center">
+                  <div className="w-full h-12 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl text-xs font-black text-slate-400">
+                    {selectedProduct?.hsn_code || '---'}
+                  </div>
+                </td>
+                <td className="px-6 py-10 text-center">
+                  <input
+                    type="number"
+                    className="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 py-3 text-center text-xl font-black text-slate-900 focus:border-blue-500 outline-none transition-all"
+                    value={activeEntry.qty || ""}
+                    onChange={e => setActiveEntry({ ...activeEntry, qty: Number(e.target.value) })}
+                    placeholder="0"
+                    min="1"
+                  />
+                </td>
+                <td className="px-6 py-10 text-right">
+                  {(role === 'ADMIN' || role === 'MANAGER') ? (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        className="w-full bg-purple-50 border-2 border-purple-100 rounded-2xl px-4 py-3 text-right text-xl font-black text-purple-700 focus:border-purple-500 outline-none transition-all placeholder:text-purple-200"
+                        value={activeEntry.manualRate || ""}
+                        placeholder={selectedProduct?.price_per_piece ? selectedProduct.price_per_piece.toString() : "Rate"}
+                        onChange={e => setActiveEntry({ ...activeEntry, manualRate: Number(e.target.value) || null })}
+                      />
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-purple-300 uppercase tracking-tighter">Override</div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-12 flex items-center justify-end px-4 bg-slate-100 rounded-2xl text-lg font-black text-slate-400">
+                      ₹{selectedProduct?.price_per_piece || '---'}
+                    </div>
+                  )}
+                </td>
+                <td className="px-6 py-10 text-center">
+                  <div className="text-xs font-black text-slate-900">{selectedProduct?.gst_rate || 0}%</div>
+                </td>
+                <td className="px-6 py-10 text-right">
+                  <div className="text-xl font-black text-slate-900 tracking-tighter">
+                    ₹{selectedProduct ? calculateItemTotal({
+                      product_id: selectedProduct.id,
+                      quantity: activeEntry.qty,
+                      manual_rate: activeEntry.manualRate !== null ? activeEntry.manualRate : undefined
+                    }).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
+                  </div>
+                </td>
+                <td className="px-6 py-10 text-center">
+                  <button
+                    onClick={addItem}
+                    disabled={!selectedProduct || activeEntry.qty <= 0}
+                    className="w-12 h-12 bg-green-600 hover:bg-green-700 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/20 active:scale-90 transition-all disabled:bg-slate-200 disabled:shadow-none"
+                  >
+                    <Plus size={24} strokeWidth={3} />
+                  </button>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Totals Section */}
-        <div className="p-6 bg-gradient-to-br from-slate-50 to-slate-100 border-t-2 border-slate-200">
-          <div className="max-w-md ml-auto space-y-3">
-            <div className="flex justify-between text-slate-600 font-medium">
+        {/* Dynamic Summary Section */}
+        <div className="p-10 bg-slate-50 border-t border-slate-100">
+          <div className="max-w-md ml-auto space-y-4">
+            <div className="flex justify-between text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em]">
               <span>Taxable Amount</span>
-              <span className="font-mono">₹{totals.taxable.toFixed(2)}</span>
+              <span className="text-slate-900 text-lg tracking-tighter">₹{totals.taxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
 
             <div
-              className="flex justify-between items-center text-slate-500 cursor-pointer hover:text-blue-600 transition-colors py-2 px-3 rounded-lg hover:bg-white/50"
+              className="flex items-center justify-between group cursor-pointer"
               onClick={() => setShowTaxes(!showTaxes)}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-slate-400 group-hover:text-blue-500 transition-colors">
                 {showTaxes ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                <span className="text-sm font-medium">GST Details</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em]">GST Breakdown</span>
               </div>
-              <span className="font-mono text-sm">₹{(totals.cgst + totals.sgst).toFixed(2)}</span>
+              <span className="text-slate-900 font-bold tracking-tighter">₹{(totals.cgst + totals.sgst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
 
             {showTaxes && (
-              <div className="pl-6 space-y-2 bg-white/60 p-3 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-1">
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>CGST</span>
-                  <span className="font-mono">₹{totals.cgst.toFixed(2)}</span>
+              <div className="space-y-2 py-3 px-6 bg-white rounded-3xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                  <span className="uppercase tracking-widest">CGST (50% of GST)</span>
+                  <span className="font-black text-slate-900 tracking-tighter">₹{totals.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>SGST</span>
-                  <span className="font-mono">₹{totals.sgst.toFixed(2)}</span>
+                <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                  <span className="uppercase tracking-widest">SGST (50% of GST)</span>
+                  <span className="font-black text-slate-900 tracking-tighter">₹{totals.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
             )}
 
             {Math.abs(roundOff) > 0.001 && (
-              <div className="flex justify-between text-slate-400 italic text-sm">
-                <span>Round Off</span>
-                <span className="font-mono">{roundOff > 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
+              <div className="flex justify-between text-[10px] font-black italic text-slate-400 uppercase tracking-widest">
+                <span>Round Off Difference</span>
+                <span className="font-bold">{roundOff > 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-4 border-t-2 border-slate-300">
-              <span className="text-xl font-bold text-slate-800">Grand Total</span>
-              <span className="text-4xl font-bold text-green-600 font-mono">₹{grandTotal.toLocaleString('en-IN')}</span>
+            <div className="pt-6 border-t-4 border-slate-900 flex justify-between items-center group">
+              <div className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">
+                Grand Total
+                <div className="text-xs font-bold text-slate-400 mt-1 normal-case tracking-normal">Fully calculated & rounded</div>
+              </div>
+              <div className="text-5xl font-black text-slate-950 tracking-tighter group-hover:scale-105 transition-transform duration-500">
+                ₹{grandTotal.toLocaleString('en-IN')}
+              </div>
             </div>
 
-            <button
-              onClick={handleSubmit}
-              disabled={items.length === 0}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none font-bold text-xl flex justify-center items-center gap-3 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none mt-4"
-            >
-              <Save size={24} strokeWidth={3} />
-              Save & Generate Invoice
-            </button>
+            {/* Action Buttons Hub */}
+            <div className="grid grid-cols-2 gap-4 mt-10">
+              <button
+                onClick={() => handleSubmit(false)}
+                disabled={items.length === 0}
+                className="bg-white border-2 border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-800 py-4 rounded-3xl font-black text-sm uppercase tracking-widest flex justify-center items-center gap-2 transition-all shadow-lg shadow-slate-100 hover:shadow-slate-200 active:scale-95 disabled:opacity-50"
+              >
+                <Save size={20} /> Save Draft
+              </button>
+              <button
+                onClick={() => handleSubmit(true)}
+                disabled={items.length === 0}
+                className="bg-slate-900 text-white hover:bg-black py-4 rounded-3xl font-black text-sm uppercase tracking-widest flex justify-center items-center gap-2 transition-all shadow-xl shadow-slate-900/20 active:scale-95 disabled:opacity-50"
+              >
+                <Printer size={20} /> Generate Invoice
+              </button>
+            </div>
           </div>
         </div>
       </div>

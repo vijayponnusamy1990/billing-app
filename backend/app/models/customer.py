@@ -8,5 +8,7 @@ class Customer(Base):
     name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
     address = Column(String, nullable=True)
+    billing_address = Column(String, nullable=True)
+    shipping_address = Column(String, nullable=True)
     gstin = Column(String, nullable=True)
     state_code = Column(String, nullable=True)

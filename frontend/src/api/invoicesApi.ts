@@ -7,7 +7,7 @@ export async function createInvoice(data: InvoiceCreate) {
 }
 
 export async function getInvoices(skip = 0, limit = 100) {
-    const res = await axiosClient.get<Invoice[]>("/invoices/", { params: { skip, limit } });
+    const res = await axiosClient.get<{ items: Invoice[], total: number }>("/invoices/", { params: { skip, limit } });
     return res.data;
 }
 

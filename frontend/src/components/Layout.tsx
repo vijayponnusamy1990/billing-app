@@ -20,7 +20,7 @@ export default function Layout() {
         { name: "Dashboard", path: "/", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "SALES"] },
         { name: "Inventory", path: "/products", icon: Package, roles: ["ADMIN", "MANAGER"] },
         { name: "New Invoice", path: "/billing/new", icon: FileText, roles: ["ADMIN", "MANAGER", "SALES"] },
-        { name: "Reports", path: "/reports", icon: BarChart, roles: ["ADMIN"] },
+
         { name: "History", path: "/history", icon: Clock, roles: ["ADMIN", "MANAGER", "SALES"] },
     ];
 

@@ -4,6 +4,8 @@ class CustomerBase(BaseModel):
     name: str
     phone: str | None = None
     address: str | None = None
+    billing_address: str | None = None
+    shipping_address: str | None = None
     gstin: str | None = None
     state_code: str | None = None
 

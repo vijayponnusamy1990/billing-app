@@ -47,6 +47,10 @@ class InvoiceItem(Base):
     sgst_amount = Column(Float, default=0.0)
     igst_amount = Column(Float, default=0.0)
 
+    @property
+    def hsn_code(self):
+        return self.product.hsn_code if self.product else None
+
     invoice = relationship("Invoice", back_populates="items")
     product = relationship("Product")
     batch = relationship("app.models.product.ProductBatch")

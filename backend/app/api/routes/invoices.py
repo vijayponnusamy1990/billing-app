@@ -7,7 +7,7 @@ from app.models.user import UserRole, User
 from app.models.product import Product, Unit, Category
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.inventory import InventoryMovement
-from app.schemas.invoice import InvoiceCreate, InvoiceOut
+from app.schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceList
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -32,6 +32,8 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
                 name=data.customer_name,
                 phone=data.customer_phone,
                 address=data.customer_address,
+                billing_address=data.customer_billing_address,
+                shipping_address=data.customer_shipping_address,
                 gstin=data.customer_gstin
             )
             db.add(new_customer)
@@ -63,10 +65,10 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
                 area_sqft = item_in.length_ft * item_in.width_ft
 
         if item_in.unit == Unit.SQFT:
-            rate = product.price_per_sqft or 0.0
+            rate = item_in.manual_rate if item_in.manual_rate is not None and current_user.role in [UserRole.ADMIN, UserRole.MANAGER] else (product.price_per_sqft or 0.0)
             qty_for_amount = area_sqft or 0.0
         else:
-            rate = product.price_per_piece or 0.0
+            rate = item_in.manual_rate if item_in.manual_rate is not None and current_user.role in [UserRole.ADMIN, UserRole.MANAGER] else (product.price_per_piece or 0.0)
             qty_for_amount = item_in.quantity
 
         taxable_amount = qty_for_amount * rate
@@ -122,6 +124,7 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
     invoice.total_sgst = total_sgst
     invoice.total_igst = total_igst
     gross = total_taxable + total_cgst + total_sgst + total_igst
+    
     invoice.grand_total = round(gross)
     invoice.round_off = invoice.grand_total - gross
 
@@ -130,11 +133,13 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
     db.refresh(invoice)
     return invoice
 
-@router.get("/", response_model=List[InvoiceOut],
+@router.get("/", response_model=InvoiceList,
              dependencies=[Depends(role_required([UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES]))])
 def get_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    invoices = db.query(Invoice).order_by(Invoice.date.desc()).offset(skip).limit(limit).all()
-    return invoices
+    query = db.query(Invoice)
+    total = query.count()
+    invoices = query.order_by(Invoice.date.desc()).offset(skip).limit(limit).all()
+    return {"items": invoices, "total": total}
 
 @router.get("/{id}", response_model=InvoiceOut,
              dependencies=[Depends(role_required([UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES]))])
