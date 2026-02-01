@@ -1,7 +1,6 @@
 """
 Unified Database Setup Script
-Combines: seed_products, migrate_products_to_piece, and migrate_batches
-Run this script to set up or reset your database with test data.
+Run this script to set up or reset your database with test data including Multi-Tenancy.
 """
 
 from sqlalchemy.orm import Session
@@ -9,6 +8,7 @@ from app.db.session import SessionLocal, engine
 from app.db.base import Base
 from app.models.product import Product, ProductBatch, Unit, Category
 from app.models.user import User, UserRole
+from app.models.owner import Owner
 from app.core.security import get_password_hash
 
 
@@ -19,282 +19,220 @@ def create_tables():
     print("✅ Tables created successfully")
 
 
-def seed_users(db: Session):
-    """Seed initial users"""
+def seed_owners(db: Session):
+    """Seed initial owners"""
+    print("\n🏢 Seeding owners...")
+    
+    owners_data = [
+        {"name": "Billing App Admin", "title": "Billing App", "domain": "localhost"},
+        {"name": "Gokul Hardwares", "title": "Gokul Hardwares and Playwoods", "domain": "gokul.com"},
+        {"name": "Aaravi Hardwares", "title": "Aaravi Hardwares and Products", "domain": "arravi.com"},
+    ]
+    
+    created_owners = {}
+    
+    for data in owners_data:
+        owner = db.query(Owner).filter(Owner.domain == data["domain"]).first()
+        if not owner:
+            print(f"  Creating Owner: {data['name']} ({data['domain']})")
+            owner = Owner(
+                name=data["name"],
+                company_title=data["title"],
+                domain=data["domain"]
+            )
+            db.add(owner)
+            db.flush() # Get ID
+        else:
+            print(f"  Owner exists: {data['name']}")
+        
+        created_owners[data["domain"]] = owner
+        
+    db.commit()
+    print("✅ Owners seeded successfully")
+    return created_owners
+
+
+def seed_users(db: Session, owners):
+    """Seed initial users for each owner"""
     print("\n👥 Seeding users...")
     
+    # helper to get owner id by domain
+    def get_oid(domain):
+        return owners[domain].id if domain in owners else None
+
+    # Define users for each tenant
     users = [
-        {
-            "email": "admin@example.com",
-            "full_name": "Admin User",
-            "password": "admin123",
-            "role": UserRole.ADMIN
-        },
-        {
-            "email": "manager@example.com",
-            "full_name": "Store Manager",
-            "password": "manager123",
-            "role": UserRole.MANAGER
-        },
-        {
-            "email": "sales@example.com",
-            "full_name": "Sales Rep",
-            "password": "sales123",
-            "role": UserRole.SALES
-        }
+        # Localhost / Default Admin
+        {"email": "admin@example.com", "name": "Super Admin", "role": UserRole.ADMIN, "owner": "localhost"},
+        
+        # Gokul Hardwares
+        {"email": "admin@gokul.com", "name": "Gokul Admin", "role": UserRole.ADMIN, "owner": "gokul.com"},
+        {"email": "manager@gokul.com", "name": "Gokul Manager", "role": UserRole.MANAGER, "owner": "gokul.com"},
+        
+        # Aaravi Hardwares
+        {"email": "admin@arravi.com", "name": "Aaravi Admin", "role": UserRole.ADMIN, "owner": "arravi.com"},
     ]
 
-    for user_data in users:
-        user = db.query(User).filter(User.email == user_data["email"]).first()
+    for u in users:
+        user = db.query(User).filter(User.email == u["email"]).first()
+        owner_id = get_oid(u["owner"])
+        
         if not user:
-            print(f"  Creating {user_data['role']} user: {user_data['email']}")
+            print(f"  Creating {u['role']} user: {u['email']} for {u['owner']}")
             new_user = User(
-                email=user_data["email"],
-                full_name=user_data["full_name"],
-                hashed_password=get_password_hash(user_data["password"]),
-                role=user_data["role"],
-                is_active=True
+                email=u["email"],
+                full_name=u["name"],
+                hashed_password=get_password_hash("admin123"), # Default password
+                role=u["role"],
+                is_active=True,
+                owner_id=owner_id
             )
             db.add(new_user)
         else:
-            print(f"  User {user_data['email']} already exists")
+            print(f"  User {u['email']} already exists")
+            # Update owner if missing
+            if user.owner_id is None and owner_id:
+                user.owner_id = owner_id
+                db.add(user)
     
     db.commit()
     print("✅ Users seeded successfully")
 
 
-def seed_products(db: Session):
-    """Seed products with piece-only pricing"""
-    print("\n📦 Seeding products...")
+def seed_products(db: Session, owners: dict):
+    print("Seeding products...")
+    import random
     
-    products = [
-        # Plywood - All priced per piece (8x4 sheet = 32 sqft)
-        {
-            "name": "Plywood Birch",
-            "category": Category.PLYWOOD,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 1440.0,  # 45/sqft × 32 sqft
-            "thickness": "6mm",
-            "gst_rate": 18.0,
-            "stock_qty": 500.0,
-            "hsn_code": "4412"
-        },
-        {
-            "name": "Plywood Birch",
-            "category": Category.PLYWOOD,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 2080.0,  # 65/sqft × 32 sqft
-            "thickness": "12mm",
-            "gst_rate": 18.0,
-            "stock_qty": 300.0,
-            "hsn_code": "4412"
-        },
-        {
-            "name": "Plywood Birch",
-            "category": Category.PLYWOOD,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 2720.0,  # 85/sqft × 32 sqft
-            "thickness": "18mm",
-            "gst_rate": 18.0,
-            "stock_qty": 200.0,
-            "hsn_code": "4412"
-        },
-        {
-            "name": "Marine Plywood",
-            "category": Category.PLYWOOD,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 3520.0,  # 110/sqft × 32 sqft
-            "thickness": "19mm",
-            "gst_rate": 18.0,
-            "stock_qty": 150.0,
-            "hsn_code": "4412"
-        },
-        
-        # Glass - All priced per piece (8x4 sheet = 32 sqft)
-        {
-            "name": "Clear Glass",
-            "category": Category.GLASS,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 800.0,  # 25/sqft × 32 sqft
-            "thickness": "4mm",
-            "gst_rate": 12.0,
-            "stock_qty": 1000.0,
-            "hsn_code": "7005"
-        },
-        {
-            "name": "Clear Glass",
-            "category": Category.GLASS,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 1120.0,  # 35/sqft × 32 sqft
-            "thickness": "6mm",
-            "gst_rate": 12.0,
-            "stock_qty": 800.0,
-            "hsn_code": "7005"
-        },
-        {
-            "name": "Toughened Glass",
-            "category": Category.GLASS,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 3840.0,  # 120/sqft × 32 sqft
-            "thickness": "10mm",
-            "gst_rate": 12.0,
-            "stock_qty": 200.0,
-            "hsn_code": "7005"
-        },
-        {
-            "name": "Toughened Glass",
-            "category": Category.GLASS,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 4800.0,  # 150/sqft × 32 sqft
-            "thickness": "12mm",
-            "gst_rate": 12.0,
-            "stock_qty": 100.0,
-            "hsn_code": "7005"
-        },
-        {
-            "name": "Frosted Glass",
-            "category": Category.GLASS,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 1760.0,  # 55/sqft × 32 sqft
-            "thickness": "5mm",
-            "gst_rate": 12.0,
-            "stock_qty": 400.0,
-            "hsn_code": "7005"
-        },
-
-        # Hardware - Already piece-based
-        {
-            "name": "Door Hinge SS",
-            "category": Category.HARDWARE,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 85.0,
-            "dimension": "4 inch",
-            "gst_rate": 18.0,
-            "stock_qty": 1000.0,
-            "hsn_code": "8302"
-        },
-        {
-            "name": "Cabinet Handle Brass",
-            "category": Category.HARDWARE,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 145.0,
-            "dimension": "6 inch",
-            "gst_rate": 18.0,
-            "stock_qty": 500.0,
-            "hsn_code": "8302"
-        },
-        {
-            "name": "Drawer Slide",
-            "category": Category.HARDWARE,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 320.0,
-            "dimension": "18 inch",
-            "gst_rate": 18.0,
-            "stock_qty": 200.0,
-            "hsn_code": "8302"
-        },
-        {
-            "name": "Mortise Lock Set",
-            "category": Category.HARDWARE,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 1850.0,
-            "gst_rate": 18.0,
-            "stock_qty": 50.0,
-            "hsn_code": "8301"
-        },
-        {
-            "name": "SDS Screws",
-            "category": Category.HARDWARE,
-            "base_unit": Unit.PIECE,
-            "price_per_piece": 1.5,
-            "dimension": "25mm",
-            "gst_rate": 18.0,
-            "stock_qty": 5000.0,
-            "hsn_code": "7318"
-        }
+    # Templates for random generation
+    modifiers = ["Premium", "Standard", "Waterproof", "Commercial", "Teak", "Matte", "Glossy", "Royal", "Elite", "Classic"]
+    
+    types = [
+        {"name": "Plywood", "category": Category.PLYWOOD, "base_unit": Unit.PIECE, "dims": ["8x4", "7x4", "6x4"], "thick": ["6mm", "12mm", "18mm", "19mm", "25mm"], "base_price": 50}, # Base price per sqft approx
+        {"name": "Laminate", "category": Category.PLYWOOD, "base_unit": Unit.PIECE, "dims": ["8x4"], "thick": ["0.8mm", "1mm", "1.25mm"], "base_price": 700}, # Base per sheet (low end)
+        {"name": "Glass", "category": Category.GLASS, "base_unit": Unit.SQFT, "dims": ["Custom"], "thick": ["4mm", "5mm", "6mm", "8mm", "10mm", "12mm"], "base_price": 65}, # Per sqft
+        {"name": "Handle", "category": Category.HARDWARE, "base_unit": Unit.PIECE, "dims": ["4 inch", "6 inch", "8 inch", "12 inch"], "thick": [""], "base_price": 150},
+        {"name": "Lock", "category": Category.HARDWARE, "base_unit": Unit.PIECE, "dims": ["Main Door", "Bedroom", "Bathroom"], "thick": [""], "base_price": 550},
+        {"name": "Hinge", "category": Category.HARDWARE, "base_unit": Unit.PIECE, "dims": ["L-Type", "W-Type", "Hydraulic"], "thick": ["0 crank", "8 crank", "16 crank"], "base_price": 120},
     ]
 
-    for prod_data in products:
-        # Check if product exists
-        existing = db.query(Product).filter(
-            Product.name == prod_data["name"],
-            Product.thickness == prod_data.get("thickness"),
-            Product.dimension == prod_data.get("dimension")
-        ).first()
+    for owner_key, owner in owners.items():
+        print(f"  Generating seeded products for {owner.name}...")
         
-        if not existing:
-            print(f"  Adding: {prod_data['name']} ({prod_data.get('thickness') or prod_data.get('dimension') or 'N/A'})")
-            db.add(Product(**prod_data))
-        else:
-            print(f"  Exists: {prod_data['name']}")
-    
-    db.commit()
-    print("✅ Products seeded successfully")
+        # Check current count to avoid duplicate huge seeding
+        current_count = db.query(Product).filter(Product.owner_id == owner.id).count()
+        needed = 50 - current_count
+        
+        if needed <= 0:
+            print(f"    Owner {owner.name} already has {current_count} products. Skipping generation.")
+            continue
 
+        print(f"    Creating {needed} new products...")
 
-def migrate_products_to_piece(db: Session):
-    """Migrate any existing SQFT products to PIECE"""
-    print("\n🔄 Migrating products to PIECE-only system...")
-    
-    products = db.query(Product).all()
-    migrated_count = 0
-    
-    for product in products:
-        if product.base_unit == Unit.SQFT:
-            print(f"  Converting: {product.name} from SQFT to PIECE")
+        for i in range(needed):
+            p_type = random.choice(types)
+            modifier = random.choice(modifiers)
+            dim = random.choice(p_type["dims"])
+            thick = random.choice(p_type["thick"])
             
-            # Calculate piece price if not set
-            if product.price_per_sqft and not product.price_per_piece:
-                standard_sheet_sqft = 32  # 8x4 sheet
-                product.price_per_piece = product.price_per_sqft * standard_sheet_sqft
-                print(f"    Price: ₹{product.price_per_piece} (₹{product.price_per_sqft}/sqft × {standard_sheet_sqft})")
+            # Construct Name
+            name_parts = [modifier, p_type['name']]
+            if thick: name_parts.insert(0, thick)
+            if dim and dim != "Custom": name_parts.append(dim)
             
-            product.base_unit = Unit.PIECE
-            migrated_count += 1
-    
-    db.commit()
-    
-    if migrated_count > 0:
-        print(f"✅ Migrated {migrated_count} products to PIECE")
-    else:
-        print("✅ All products already using PIECE")
-
-
-def create_initial_batches(db: Session):
-    """Create initial product batches for inventory tracking"""
-    print("\n📊 Creating initial product batches...")
-    
-    products = db.query(Product).all()
-    created_count = 0
-    
-    for product in products:
-        if not product.batches:
-            price = product.price_per_piece or 0.0
+            name = " ".join(name_parts)
             
+            # Pricing Logic
+            buying_price = 0
+            selling_price = 0
+            sqft_per_piece = 0
+            price_per_sqft = 0
+            
+            # 1. Calculation initialization
+            base_cost = p_type["base_price"] * random.uniform(0.9, 1.4)
+            
+            if p_type["category"] == Category.PLYWOOD and p_type["base_unit"] == Unit.PIECE:
+                # Plywood Sheet Pricing
+                area = 32 # Default 8x4
+                if "7x4" in dim: area = 28
+                elif "6x4" in dim: area = 24
+                elif "7x3" in dim: area = 21
+                
+                sqft_per_piece = area
+                
+                # Using heuristic pricing
+                # If laminate (which is Plywood category in this simplified model but names differ)
+                if p_type["name"] == "Laminate":
+                    selling_price = int(base_cost * random.uniform(1.2, 1.6))
+                    price_per_sqft = round(selling_price / area, 2)
+                else:
+                    # Plywood logic: base_cost is roughly per sqft for standard thickness (say 12mm)
+                    # Adjust for thickness
+                    mm = 12
+                    if "mm" in thick:
+                        try: mm = float(thick.replace("mm",""))
+                        except: pass
+                    
+                    adjusted_cost = base_cost * (mm / 12) 
+                    selling_price = int(adjusted_cost * area * random.uniform(1.1, 1.3))
+                    price_per_sqft = round(selling_price / area, 2)
+                    
+            elif p_type["category"] == Category.GLASS:
+                 # Glass is per SqFt usually
+                 # base_cost is per sqft for 4mm
+                 mm = 4
+                 if "mm" in thick:
+                    try: mm = float(thick.replace("mm",""))
+                    except: pass
+                 
+                 adjusted_sqft_cost = base_cost * (mm / 4) 
+                 selling_price = int(adjusted_sqft_cost * random.uniform(1.3, 1.8))
+                 # For unit=SQFT, selling_price is price per sqft
+                 
+            else:
+                # Hardware / per piece
+                selling_price = int(base_cost * random.uniform(1.3, 1.8))
+            
+            # Buying Price
+            buying_price = int(selling_price * 0.70)
+            stock = random.randint(10, 300)
+
+            # Create Product
+            product = Product(
+                name=name,
+                category=p_type["category"],
+                base_unit=p_type["base_unit"],
+                stock_qty=stock,
+                price_per_piece=selling_price,
+                price_per_sqft=price_per_sqft if price_per_sqft > 0 else None,
+                sqft_per_piece=sqft_per_piece if sqft_per_piece > 0 else None,
+                thickness=thick,
+                dimension=dim,
+                gst_rate=18,
+                owner_id=owner.id
+            )
+            
+            db.add(product)
+            db.flush()
+
+            # Create Batch
             batch = ProductBatch(
                 product_id=product.id,
-                sku="INITIAL",
-                buying_price=0.0,  # Unknown for initial stock
-                selling_price=price,
-                initial_qty=product.stock_qty,
-                current_qty=product.stock_qty
+                sku=f"AUTO-{owner.id}-{random.randint(10000,99999)}",
+                buying_price=buying_price,
+                selling_price=selling_price,
+                initial_qty=stock,
+                current_qty=stock
             )
             db.add(batch)
-            created_count += 1
-            print(f"  Created batch for: {product.name} (Stock: {product.stock_qty})")
-    
+            
     db.commit()
-    
-    if created_count > 0:
-        print(f"✅ Created {created_count} initial batches")
-    else:
-        print("✅ All products already have batches")
+    print("✅ Products seeded successfully")
 
 
 def setup_database():
     """Main setup function"""
     print("=" * 70)
-    print("🚀 DATABASE SETUP - Billing App")
+    print("🚀 DATABASE SETUP - Billing App (Multi-Tenant)")
     print("=" * 70)
     
     db = SessionLocal()
@@ -303,26 +241,18 @@ def setup_database():
         # Step 1: Create tables
         create_tables()
         
-        # Step 2: Seed users
-        seed_users(db)
+        # Step 2: Seed Owners
+        owners = seed_owners(db)
         
-        # Step 3: Seed products
-        seed_products(db)
+        # Step 3: Seed Users
+        seed_users(db, owners)
         
-        # Step 4: Migrate any SQFT products to PIECE
-        migrate_products_to_piece(db)
-        
-        # Step 5: Create initial batches
-        create_initial_batches(db)
+        # Step 4: Seed Products
+        seed_products(db, owners)
         
         print("\n" + "=" * 70)
         print("✅ DATABASE SETUP COMPLETE!")
         print("=" * 70)
-        print("\n📝 Login Credentials:")
-        print("  Admin:   admin@example.com / admin123")
-        print("  Manager: manager@example.com / manager123")
-        print("  Sales:   sales@example.com / sales123")
-        print()
         
     except Exception as e:
         print(f"\n❌ Error during setup: {e}")
@@ -330,6 +260,10 @@ def setup_database():
         raise
     finally:
         db.close()
+
+
+if __name__ == "__main__":
+    setup_database()
 
 
 if __name__ == "__main__":

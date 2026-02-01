@@ -3,6 +3,19 @@ export enum Unit {
     PIECE = "PIECE"
 }
 
+export enum PaymentStatus {
+    PENDING = "PENDING",
+    PAID = "PAID"
+}
+
+export enum PaymentMode {
+    CASH = "CASH",
+    UPI = "UPI",
+    CARD = "CARD",
+    NET_BANKING = "NET_BANKING",
+    CHEQUE = "CHEQUE"
+}
+
 export enum Category {
     PLYWOOD = "PLYWOOD",
     GLASS = "GLASS",
@@ -34,6 +47,7 @@ export interface ProductCreate {
     sqft_per_piece?: number;
     price_per_sqft?: number;
     price_per_piece?: number;
+    buying_price?: number;
     stock_qty: number;
     thickness?: string;
     dimension?: string;
@@ -59,24 +73,42 @@ export interface Customer {
     id: number;
     name: string;
     phone?: string;
-    address?: string; // Legacy
-    billing_address?: string;
-    shipping_address?: string;
+    billing_line1?: string;
+    billing_line2?: string;
+    billing_city?: string;
+    billing_state?: string;
+    billing_zip?: string;
+    shipping_line1?: string;
+    shipping_line2?: string;
+    shipping_city?: string;
+    shipping_state?: string;
+    shipping_zip?: string;
     gstin?: string;
+    refer_by?: string;
 }
 
 export interface InvoiceCreate {
     customer_id?: number;
     customer_name?: string;
     customer_phone?: string;
-    customer_billing_address?: string;
-    customer_shipping_address?: string;
-    customer_address?: string;
+    customer_billing_line1?: string;
+    customer_billing_line2?: string;
+    customer_billing_city?: string;
+    customer_billing_state?: string;
+    customer_billing_zip?: string;
+    customer_shipping_line1?: string;
+    customer_shipping_line2?: string;
+    customer_shipping_city?: string;
+    customer_shipping_state?: string;
+    customer_shipping_zip?: string;
     customer_gstin?: string;
+    customer_refer_by?: string;
     date?: string; // ISO date string
     invoice_no: string;
     items: InvoiceItemCreate[];
     notes?: string;
+    payment_status?: PaymentStatus;
+    payment_mode?: PaymentMode;
 }
 
 export interface InvoiceItem {
@@ -112,5 +144,18 @@ export interface Invoice {
     total_igst: number;
     grand_total: number;
     round_off: number;
+    payment_status: PaymentStatus;
+    payment_mode?: PaymentMode;
     items: InvoiceItem[];
+}
+
+export interface Owner {
+    id: number;
+    name: string;
+    company_title: string;
+    logo_url?: string;
+    domain?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
 }

@@ -26,9 +26,12 @@ export default function InvoicesPage() {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <Clock className="text-blue-600" /> Invoice History
-                </h1>
+                <div>
+                    <h1 className="page-title flex items-center gap-2">
+                        <Clock className="text-blue-600" /> Invoice History
+                    </h1>
+                    <p className="sub-text mt-1">Monitor and manage your past transactions.</p>
+                </div>
             </div>
 
             <div className="card p-0 overflow-hidden">

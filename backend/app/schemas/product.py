@@ -17,7 +17,7 @@ class ProductBase(BaseModel):
     low_stock_limit: float = 0.0
 
 class ProductCreate(ProductBase):
-    pass
+    buying_price: float | None = 0.0
 
 class ProductOut(ProductBase):
     id: int

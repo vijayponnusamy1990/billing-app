@@ -6,6 +6,8 @@ import ProductEditPage from "./pages/ProductEditPage";
 import NewInvoicePage from "./pages/NewInvoicePage";
 import InvoicesPage from "./pages/InvoicesPage";
 import InvoiceDetailsPage from "./pages/InvoiceDetailsPage";
+import CustomersPage from "./pages/CustomersPage";
+import CustomerDetailsPage from "./pages/CustomerDetailsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import { ToastProvider } from "./components/Toaster";
@@ -22,6 +24,9 @@ export default function App() {
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/:id/edit" element={<ProductEditPage />} />
             <Route path="/billing/new" element={<NewInvoicePage />} />
+
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers/:id" element={<CustomerDetailsPage />} />
 
             <Route path="/history" element={<InvoicesPage />} />
             <Route path="/invoices/:id" element={<InvoiceDetailsPage />} />

@@ -8,7 +8,9 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     user_id: int
     role: UserRole
+    owner_id: int
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+    owner_id: int

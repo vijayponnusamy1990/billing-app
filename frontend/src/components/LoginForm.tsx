@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axiosClient from "../api/axiosClient";
 import { jwtDecode } from "jwt-decode";
+import { useTenant } from "../contexts/TenantContext";
 
 interface Props {
   onLogin: () => void;
@@ -11,13 +12,19 @@ export default function LoginForm({ onLogin }: Props) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { tenant } = useTenant();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tenant) {
+      setError("Tenant context missing. Please refresh.");
+      return;
+    }
+
     setError("");
     setLoading(true);
     try {
-      const res = await axiosClient.post("/auth/login", { email, password });
+      const res = await axiosClient.post("/auth/login", { email, password, owner_id: tenant.id });
       const token = res.data.access_token;
       localStorage.setItem("token", token);
 
@@ -25,9 +32,13 @@ export default function LoginForm({ onLogin }: Props) {
       localStorage.setItem("role", decoded.role);
 
       onLogin();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("Invalid credentials used");
+      if (err.response && err.response.status === 403) {
+        setError("Account does not belong to this site.");
+      } else {
+        setError("Invalid credentials used");
+      }
     } finally {
       setLoading(false);
     }

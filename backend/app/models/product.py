@@ -30,6 +30,7 @@ class Product(Base):
     gst_rate = Column(Float, default=0.0)
     stock_qty = Column(Float, default=0.0)
     low_stock_limit = Column(Float, default=0.0)
+    owner_id = Column(Integer, index=True, nullable=True)
 
     batches = relationship("ProductBatch", back_populates="product", cascade="all, delete-orphan")
 

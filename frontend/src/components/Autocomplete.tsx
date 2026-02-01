@@ -18,6 +18,7 @@ interface Props {
     value?: string;
     onChange?: (val: string) => void;
     dropdownPosition?: 'top' | 'bottom';
+    inputClassName?: string;
 }
 
 export default function Autocomplete({
@@ -28,7 +29,8 @@ export default function Autocomplete({
     asyncSearch,
     value,
     onChange,
-    dropdownPosition = 'bottom'
+    dropdownPosition = 'bottom',
+    inputClassName = "input-field"
 }: Props) {
     const [query, setQuery] = useState("");
     const [isOpen, setIsOpen] = useState(false);
@@ -128,7 +130,7 @@ export default function Autocomplete({
                 </div>
                 <input
                     type="text"
-                    className="input-field pl-10"
+                    className={`${inputClassName} ${inputClassName.includes('px-') || inputClassName.includes('pl-') ? '' : 'pl-10'}`}
                     placeholder={placeholder}
                     value={query}
                     onChange={handleInputChange}

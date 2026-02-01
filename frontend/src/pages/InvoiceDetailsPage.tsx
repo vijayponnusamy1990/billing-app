@@ -101,7 +101,15 @@ export default function InvoiceDetailsPage() {
                             <span className="font-bold">{invoice.customer?.name}</span>
 
                             <span className="font-bold">Address</span>
-                            <span className="whitespace-pre-wrap">{invoice.customer?.billing_address || invoice.customer?.address}</span>
+                            <span className="whitespace-pre-wrap">
+                                {[
+                                    invoice.customer?.billing_line1,
+                                    invoice.customer?.billing_line2,
+                                    invoice.customer?.billing_city,
+                                    invoice.customer?.billing_state,
+                                    invoice.customer?.billing_zip
+                                ].filter(Boolean).join(", ")}
+                            </span>
 
                             <span className="font-bold">Phone</span>
                             <span>{invoice.customer?.phone}</span>

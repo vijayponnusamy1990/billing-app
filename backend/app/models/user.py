@@ -16,3 +16,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.SALES)
     is_active = Column(Boolean, default=True)
+    owner_id = Column(Integer, index=True, nullable=True) # Multitenancy

@@ -1,8 +1,8 @@
 import axiosClient from "./axiosClient";
 import { Product, ProductCreate } from "../types";
 
-export async function getProducts() {
-    const res = await axiosClient.get<Product[]>("/products/");
+export async function getProducts(params: { skip?: number; limit?: number; q?: string } = {}) {
+    const res = await axiosClient.get<Product[]>("/products/", { params });
     return res.data;
 }
 

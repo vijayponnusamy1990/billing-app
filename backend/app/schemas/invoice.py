@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime
 from app.models.product import Unit
+from app.models.invoice import PaymentStatus, PaymentMode
 from app.schemas.customer import CustomerOut
 
 class InvoiceItemCreate(BaseModel):
@@ -22,11 +23,25 @@ class InvoiceCreate(BaseModel):
     # Input fields for creating a new customer on the fly
     customer_name: str | None = None
     customer_phone: str | None = None
-    customer_address: str | None = None
-    customer_billing_address: str | None = None
-    customer_shipping_address: str | None = None
+    
+    # Granular fields
+    customer_billing_line1: str | None = None
+    customer_billing_line2: str | None = None
+    customer_billing_city: str | None = None
+    customer_billing_state: str | None = None
+    customer_billing_zip: str | None = None
+    
+    customer_shipping_line1: str | None = None
+    customer_shipping_line2: str | None = None
+    customer_shipping_city: str | None = None
+    customer_shipping_state: str | None = None
+    customer_shipping_zip: str | None = None
+
     customer_gstin: str | None = None
+    customer_refer_by: str | None = None
     date: datetime | None = None  # Optional override
+    payment_status: PaymentStatus | None = PaymentStatus.PENDING
+    payment_mode: PaymentMode | None = None
     notes: str | None = None
     items: List[InvoiceItemCreate]
 
@@ -62,6 +77,8 @@ class InvoiceOut(BaseModel):
     total_igst: float
     grand_total: float
     round_off: float
+    payment_status: PaymentStatus
+    payment_mode: PaymentMode | None = None
     customer: CustomerOut | None = None
     items: List[InvoiceItemOut]
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.session import get_db
-from app.api.deps import role_required
+from app.api.deps import role_required, get_current_user
 from app.models.user import UserRole, User
 from app.models.product import Product, Unit, Category
 from app.models.invoice import Invoice, InvoiceItem
@@ -16,14 +16,16 @@ from datetime import datetime
 
 @router.post("/", response_model=InvoiceOut,
              dependencies=[Depends(role_required([UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES]))])
-def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_user: User = Depends(role_required([UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES]))):
+def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Handle Customer Logic
     customer_id = data.customer_id
     if not customer_id and data.customer_name:
-        # Check if customer exists by phone? For now, let's just create a new one to be simple, 
-        # or find by phone if provided.
+        # Check if customer exists by phone
         if data.customer_phone:
-            existing = db.query(Customer).filter(Customer.phone == data.customer_phone).first()
+            existing = db.query(Customer).filter(
+                Customer.phone == data.customer_phone,
+                Customer.owner_id == current_user.owner_id
+            ).first()
             if existing:
                 customer_id = existing.id
         
@@ -31,10 +33,21 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
             new_customer = Customer(
                 name=data.customer_name,
                 phone=data.customer_phone,
-                address=data.customer_address,
-                billing_address=data.customer_billing_address,
-                shipping_address=data.customer_shipping_address,
-                gstin=data.customer_gstin
+                # Granular billing
+                billing_line1=data.customer_billing_line1,
+                billing_line2=data.customer_billing_line2,
+                billing_city=data.customer_billing_city,
+                billing_state=data.customer_billing_state,
+                billing_zip=data.customer_billing_zip,
+                # Granular shipping
+                shipping_line1=data.customer_shipping_line1,
+                shipping_line2=data.customer_shipping_line2,
+                shipping_city=data.customer_shipping_city,
+                shipping_state=data.customer_shipping_state,
+                shipping_zip=data.customer_shipping_zip,
+                gstin=data.customer_gstin,
+                refer_by=data.customer_refer_by,
+                owner_id=current_user.owner_id
             )
             db.add(new_customer)
             db.flush() # get ID
@@ -47,12 +60,18 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
         customer_id=customer_id,
         date=invoice_date,
         notes=data.notes,
+        owner_id=current_user.owner_id
     )
 
     total_taxable = total_cgst = total_sgst = total_igst = 0.0
 
     for item_in in data.items:
-        product = db.query(Product).get(item_in.product_id)
+        # Ensure product belongs to owner
+        product = db.query(Product).filter(
+            Product.id == item_in.product_id,
+            Product.owner_id == current_user.owner_id
+        ).first()
+        
         if not product:
             raise HTTPException(status_code=400, detail="Invalid product")
 
@@ -116,6 +135,7 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
             quantity_change=stock_delta,
             reason="SALE",
             created_by_user_id=current_user.id,
+            owner_id=current_user.owner_id
         )
         db.add(move)
 
@@ -135,16 +155,16 @@ def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), current_u
 
 @router.get("/", response_model=InvoiceList,
              dependencies=[Depends(role_required([UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES]))])
-def get_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    query = db.query(Invoice)
+def get_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    query = db.query(Invoice).filter(Invoice.owner_id == current_user.owner_id)
     total = query.count()
     invoices = query.order_by(Invoice.date.desc()).offset(skip).limit(limit).all()
     return {"items": invoices, "total": total}
 
 @router.get("/{id}", response_model=InvoiceOut,
              dependencies=[Depends(role_required([UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES]))])
-def get_invoice(id: int, db: Session = Depends(get_db)):
-    invoice = db.query(Invoice).filter(Invoice.id == id).first()
+def get_invoice(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    invoice = db.query(Invoice).filter(Invoice.id == id, Invoice.owner_id == current_user.owner_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return invoice

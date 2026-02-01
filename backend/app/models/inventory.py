@@ -11,5 +11,6 @@ class InventoryMovement(Base):
     reason = Column(String, nullable=False)  # SALE, PURCHASE, ADJUSTMENT
     ref_invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(Integer, index=True, nullable=True)
 
     product = relationship("Product")

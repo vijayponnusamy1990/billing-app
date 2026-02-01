@@ -12,6 +12,9 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const LIMIT = 20;
 
   // Form State
   const [formData, setFormData] = useState<ProductCreate>({
@@ -31,7 +34,7 @@ export default function ProductsPage() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const data = await getProducts();
+      const data = await getProducts({ skip: (page - 1) * LIMIT, limit: LIMIT, q: searchQuery });
       setProducts(data);
     } catch (e) {
       console.error(e);
@@ -43,7 +46,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [page, searchQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,25 +77,27 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Inventory</h1>
-          <p className="text-slate-500">Manage your products and stock levels.</p>
+          <h1 className="page-title">Inventory</h1>
+          <p className="sub-text mt-1">Manage your products and stock levels.</p>
         </div>
         <button
           onClick={() => setIsCreating(!isCreating)}
-          className="btn-primary flex items-center gap-2"
+          className="btn btn-primary btn-md flex items-center gap-2"
         >
           {isCreating ? "Cancel" : <><Plus size={18} /> Add Product</>}
         </button>
       </div>
 
       {isCreating && (
-        <div className="card animate-fade-in-down">
-          <h2 className="text-lg font-semibold mb-4 text-slate-800">Add New Product</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
+        <div className="card animate-fade-in-down p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold text-slate-800">Add New Product</h2>
+          </div>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Product Name</label>
               <input
-                className="input-field"
+                className="input-field font-semibold"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
@@ -101,7 +106,7 @@ export default function ProductsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Category</label>
               <select
                 className="input-field"
                 value={formData.category}
@@ -114,20 +119,7 @@ export default function ProductsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Unit</label>
-              <select
-                className="input-field"
-                value={formData.base_unit}
-                onChange={(e) => setFormData({ ...formData, base_unit: e.target.value as Unit })}
-              >
-                {Object.values(Unit).map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Current Stock</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Stock Qty</label>
               <input
                 type="number"
                 className="input-field"
@@ -136,60 +128,69 @@ export default function ProductsPage() {
               />
             </div>
 
-            <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Thickness</label>
-                <input
-                  className="input-field"
-                  value={formData.thickness}
-                  onChange={(e) => setFormData({ ...formData, thickness: e.target.value })}
-                  placeholder="Ex. 12mm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Dimension</label>
-                <input
-                  className="input-field"
-                  value={formData.dimension}
-                  onChange={(e) => setFormData({ ...formData, dimension: e.target.value })}
-                  placeholder="Ex. 8x4"
-                />
-              </div>
-            </div>
-
-            <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Price / SqFt (₹)</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  value={formData.price_per_sqft}
-                  onChange={(e) => setFormData({ ...formData, price_per_sqft: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">GST Rate (%)</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  value={formData.gst_rate}
-                  onChange={(e) => setFormData({ ...formData, gst_rate: Number(e.target.value) })}
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Thickness</label>
+              <input
+                className="input-field"
+                value={formData.thickness}
+                onChange={(e) => setFormData({ ...formData, thickness: e.target.value })}
+                placeholder="Ex. 12mm"
+              />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Price / Piece (₹)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Dimension</label>
+              <input
+                className="input-field"
+                value={formData.dimension}
+                onChange={(e) => setFormData({ ...formData, dimension: e.target.value })}
+                placeholder="Ex. 8x4"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Buying Price (₹)</label>
               <input
                 type="number"
                 className="input-field"
+                value={formData.buying_price}
+                onChange={(e) => setFormData({ ...formData, buying_price: Number(e.target.value) })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Selling Price (₹)</label>
+              <input
+                type="number"
+                className="input-field font-bold text-slate-800"
                 value={formData.price_per_piece}
                 onChange={(e) => setFormData({ ...formData, price_per_piece: Number(e.target.value) })}
               />
             </div>
 
-            <div className="md:col-span-3 flex justify-end">
-              <button type="submit" className="btn-primary">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">SqFt per Piece</label>
+              <input
+                type="number"
+                className="input-field"
+                value={formData.sqft_per_piece}
+                onChange={(e) => setFormData({ ...formData, sqft_per_piece: Number(e.target.value) })}
+                placeholder="Ex. 32"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">GST Rate (%)</label>
+              <input
+                type="number"
+                className="input-field"
+                value={formData.gst_rate}
+                onChange={(e) => setFormData({ ...formData, gst_rate: Number(e.target.value) })}
+              />
+            </div>
+
+            <div className="md:col-span-4 flex justify-end mt-2">
+              <button type="submit" className="btn btn-primary w-full md:w-auto px-8">
                 Save Product
               </button>
             </div>
@@ -201,9 +202,17 @@ export default function ProductsPage() {
         <div className="p-4 border-b border-slate-100 flex gap-4 items-center bg-slate-50/50">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-            <input placeholder="Search products..." className="input-field pl-10" />
+            <input
+              placeholder="Search products..."
+              className="input-field pl-10"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+            />
           </div>
-          <button className="btn-secondary flex items-center gap-2"><Filter size={18} /> Filter</button>
+          <button className="btn btn-secondary btn-md flex items-center gap-2"><Filter size={18} /> Filter</button>
         </div>
 
         {loading ? (
@@ -251,6 +260,25 @@ export default function ProductsPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center pt-4">
+        <button
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          disabled={page === 1}
+          className="btn btn-secondary btn-sm"
+        >
+          Previous
+        </button>
+        <span className="text-sm font-bold text-slate-500">Page {page}</span>
+        <button
+          onClick={() => setPage(p => p + 1)}
+          disabled={products.length < LIMIT}
+          className="btn btn-secondary btn-sm"
+        >
+          Next
+        </button>
       </div>
     </div>
   );

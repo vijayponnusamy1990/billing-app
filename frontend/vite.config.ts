@@ -8,7 +8,11 @@ export default defineConfig({
     host: true, // Listen on all addresses, including LAN and public addresses
     allowedHosts: [
       "dev.aaravicouture.in",
-      "aaravicouture.in"
+      "aaravicouture.in",
+      "owner1.aaravicouture.in",
+      "owner2.aaravicouture.in",
+      "gokul.com",
+      "arravi.com"
     ],
     proxy: {
       "/api": {

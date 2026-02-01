@@ -13,5 +13,9 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
 
-    token = create_access_token({"user_id": user.id, "role": user.role.value})
+    # Enforce Multi-Tenancy
+    if user.owner_id != data.owner_id:
+         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User does not belong to this tenant")
+
+    token = create_access_token({"user_id": user.id, "role": user.role.value, "owner_id": user.owner_id})
     return {"access_token": token, "token_type": "bearer"}

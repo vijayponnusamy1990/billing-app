@@ -1,10 +1,12 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, FileText, BarChart, LogOut, Hexagon, Clock } from "lucide-react";
+import { LayoutDashboard, Package, FileText, BarChart, LogOut, Hexagon, Clock, Users } from "lucide-react";
+import { useTenant } from "../contexts/TenantContext";
 
 export default function Layout() {
     const location = useLocation();
     const navigate = useNavigate();
     const role = localStorage.getItem("role") || "SALES"; // Default to minimal permission
+    const { tenant } = useTenant();
 
     const handleLogout = () => {
         localStorage.removeItem("token");
@@ -18,6 +20,7 @@ export default function Layout() {
     // ADMIN: Everything
     const allNavItems = [
         { name: "Dashboard", path: "/", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "SALES"] },
+        { name: "Customers", path: "/customers", icon: Users, roles: ["ADMIN", "MANAGER", "SALES"] },
         { name: "Inventory", path: "/products", icon: Package, roles: ["ADMIN", "MANAGER"] },
         { name: "New Invoice", path: "/billing/new", icon: FileText, roles: ["ADMIN", "MANAGER", "SALES"] },
 
@@ -32,7 +35,9 @@ export default function Layout() {
             <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col">
                 <div className="h-16 flex items-center px-6 border-b border-slate-100">
                     <Hexagon className="text-blue-600 mr-2" fill="currentColor" fillOpacity={0.1} />
-                    <span className="font-bold text-lg tracking-tight text-slate-900">Glasses & Hardwares Ltd</span>
+                    <span className="font-bold text-lg tracking-tight text-slate-900 truncate" title={tenant?.company_title}>
+                        {tenant?.company_title || "Billing App"}
+                    </span>
                 </div>
 
                 <div className="px-6 py-4">
@@ -77,7 +82,9 @@ export default function Layout() {
             <main className="flex-1 flex flex-col overflow-hidden">
                 {/* Mobile Header */}
                 <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center px-4 justify-between">
-                    <span className="font-bold text-lg text-slate-900">Glasses & Hardwares Ltd</span>
+                    <span className="font-bold text-lg text-slate-900 truncate">
+                        {tenant?.company_title || "Billing App"}
+                    </span>
                     <button onClick={handleLogout} className="text-slate-500"><LogOut size={20} /></button>
                 </div>
 

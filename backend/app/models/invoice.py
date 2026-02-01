@@ -1,8 +1,20 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import enum
 from app.db.base_class import Base
 from app.models.product import Unit
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    PAID = "PAID"
+
+class PaymentMode(str, enum.Enum):
+    CASH = "CASH"
+    UPI = "UPI"
+    CARD = "CARD"
+    NET_BANKING = "NET_BANKING"
+    CHEQUE = "CHEQUE"
 
 class Invoice(Base):
     __tablename__ = "invoices"
@@ -17,7 +29,10 @@ class Invoice(Base):
     total_igst = Column(Float, default=0.0)
     grand_total = Column(Float, default=0.0)
     round_off = Column(Float, default=0.0)
+    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+    payment_mode = Column(Enum(PaymentMode), nullable=True)
     notes = Column(String, nullable=True)
+    owner_id = Column(Integer, index=True, nullable=True)
 
     customer = relationship("Customer")
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
