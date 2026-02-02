@@ -140,7 +140,7 @@ export default function Autocomplete({
             </div>
 
             {isOpen && displayOptions.length > 0 && query.length > 0 && (
-                <div className={`absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-fade-in ${dropdownPosition === 'top' ? 'bottom-full mb-1' : 'mt-1'
+                <div className={`absolute z-[100] w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-fade-in ${dropdownPosition === 'top' ? 'bottom-full mb-1' : 'mt-1'
                     }`}>
                     {displayOptions.map((opt, index) => (
                         <div

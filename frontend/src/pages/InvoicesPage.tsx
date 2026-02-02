@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getInvoices } from "../api/invoicesApi";
 import { Invoice } from "../types";
-import { Eye, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { PaymentStatus } from "../types";
 
 export default function InvoicesPage() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -41,6 +42,7 @@ export default function InvoicesPage() {
                             <th className="table-th pl-6">Invoice #</th>
                             <th className="table-th">Date</th>
                             <th className="table-th">Customer</th>
+                            <th className="table-th text-center">Status</th>
                             <th className="table-th text-right">Amount</th>
                             <th className="table-th text-right pr-6">Action</th>
                         </tr>
@@ -60,10 +62,19 @@ export default function InvoicesPage() {
                                     {inv.customer?.name || "Unknown"}
                                     {inv.customer?.gstin && <span className="text-xs ml-2 text-slate-400 bg-slate-100 px-1 rounded">GST</span>}
                                 </td>
+                                <td className="table-td text-center">
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${inv.payment_status === PaymentStatus.PAID
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                        : 'bg-orange-50 text-orange-700 border-orange-100'
+                                        }`}>
+                                        {inv.payment_status === PaymentStatus.PAID ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                                        {inv.payment_status}
+                                    </span>
+                                </td>
                                 <td className="table-td text-right font-mono font-bold">₹{inv.grand_total.toLocaleString('en-IN')}</td>
                                 <td className="table-td text-right pr-6">
-                                    <Link to={`/invoices/${inv.id}`} className="text-slate-500 hover:text-blue-600 inline-flex items-center gap-1 text-sm font-medium">
-                                        <Eye size={16} /> View
+                                    <Link to={`/billing/${inv.id}`} className="text-slate-500 hover:text-blue-600 inline-flex items-center gap-1 text-sm font-medium">
+                                        <Eye size={16} /> View/Edit
                                     </Link>
                                 </td>
                             </tr>

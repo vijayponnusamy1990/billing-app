@@ -24,6 +24,7 @@ export default function App() {
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/:id/edit" element={<ProductEditPage />} />
             <Route path="/billing/new" element={<NewInvoicePage />} />
+            <Route path="/billing/:id" element={<NewInvoicePage />} />
 
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/customers/:id" element={<CustomerDetailsPage />} />

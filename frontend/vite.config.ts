@@ -7,10 +7,8 @@ export default defineConfig({
     port: 80,
     host: true, // Listen on all addresses, including LAN and public addresses
     allowedHosts: [
-      "dev.aaravicouture.in",
-      "aaravicouture.in",
-      "owner1.aaravicouture.in",
-      "owner2.aaravicouture.in",
+      "gokul.aaravicouture.in",
+      "aaravi.aaravicouture.in",
       "gokul.com",
       "arravi.com"
     ],

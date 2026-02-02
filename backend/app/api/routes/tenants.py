@@ -11,7 +11,15 @@ def resolve_tenant(domain: str = Query(..., alias="domain"), db: Session = Depen
     """
     Resolve tenant by domain (or localhost for dev).
     """
-    owner = db.query(Owner).filter(Owner.domain == domain).first()
+    # Domain Aliases
+    aliases = {
+        "gokul.aaravicouture.in": "gokul.com",
+        "aaravi.aaravicouture.in": "arravi.com"
+    }
+    
+    search_domain = aliases.get(domain, domain)
+    
+    owner = db.query(Owner).filter(Owner.domain == search_domain).first()
     if not owner:
         # Fallback for localhost development if strict domain match fails
         if 'localhost' in domain or '127.0.0.1' in domain:

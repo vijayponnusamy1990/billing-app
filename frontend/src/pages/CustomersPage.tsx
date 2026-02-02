@@ -81,7 +81,7 @@ export default function CustomersPage() {
 
     const handleCreateInvoice = (e: React.MouseEvent, customer: Customer) => {
         e.stopPropagation();
-        navigate('/invoices/new', { state: { customer } });
+        navigate('/billing/new', { state: { customer } });
     };
 
     return (

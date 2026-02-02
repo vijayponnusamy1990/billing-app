@@ -15,3 +15,8 @@ export async function getInvoice(id: number) {
     const res = await axiosClient.get<Invoice>(`/invoices/${id}`);
     return res.data;
 }
+
+export async function updateInvoice(id: number, data: InvoiceCreate) {
+    const res = await axiosClient.put(`/invoices/${id}`, data);
+    return res.data;
+}

@@ -91,7 +91,7 @@ export default function DashboardPage() {
       <div className="flex flex-col items-center justify-center h-96 text-center">
         <h2 className="text-2xl font-bold text-slate-700">Welcome, Sales Associate</h2>
         <p className="text-slate-500 mt-2">Please proceed to create invoices or manage orders.</p>
-        <Link to="/billing/new" className="mt-6 btn-primary">Create New Invoice</Link>
+        <Link to="/billing/new" className="mt-6 btn btn-primary btn-md">Create New Invoice</Link>
       </div>
     )
   }
@@ -104,7 +104,7 @@ export default function DashboardPage() {
           <h1 className="page-title">Executive Overview</h1>
           <p className="sub-text mt-1">Real-time performance metrics.</p>
         </div>
-        <Link to="/billing/new" className="btn btn-primary">
+        <Link to="/billing/new" className="btn btn-primary btn-md">
           <Plus size={18} strokeWidth={3} /> New Invoice
         </Link>
       </div>
